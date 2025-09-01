@@ -11,6 +11,9 @@ import time, math
 import ufo_base
 import ufo_beam
 import abduction
+import city
+import random
+
 
 keys_down = set()
 last_time = None
@@ -43,7 +46,7 @@ def update(dt):
         ufo_base.ufo_yaw += ufo_base.ufo_turn_speed*dt
     if can_move and b'e' in keys_down:
         ufo_base.ufo_yaw -= ufo_base.ufo_turn_speed*dt
-    
+
     #landing/accending
     if ufo_beam.ufo_state == "flying" and b'l' in keys_down:
         ufo_beam.ufo_state = "landing"
@@ -69,23 +72,32 @@ def update(dt):
     # beam cooldown ticking
     if ufo_beam.beam_cooldown_left > 0.0:
         ufo_beam.beam_cooldown_left = max(0.0, ufo_beam.beam_cooldown_left - dt)
+    
+
+
 
     # Abduction check
     if ufo_beam.beam_active:
         h = max(1.0, pos[2])
         top_r = 6.0
-        radius_ground = math.tan(math.radians(ufo_beam.beam_angle_deg))*h + top_r
+        radius_ground = math.tan(math.radians(ufo_beam.beam_angle_deg)) * h + top_r
         for hmn in abduction.humans:
-            if hmn['abducted']: continue
+            if hmn['abducted']:
+                continue
             dx = hmn['x'] - pos[0]
             dy = hmn['y'] - pos[1]
             dist = math.hypot(dx, dy)
-            if dist <= radius_ground * 0.75:
-                target = max(0.0, pos[2]-6.0)
-                hmn['lifted'] = min(target, hmn['lifted'] + 30.0*dt)
-                if hmn['lifted'] >= target-0.1:
+            if dist <= radius_ground:
+                # target height = UFO belly
+                target_height = pos[2] - 6.0  
+                # move human upward gradually
+                hmn['lifted'] += 80.0 * dt  
+                if hmn['lifted'] >= target_height:
+                    hmn['lifted'] = target_height
                     hmn['abducted'] = True
                     abduction.score += 1
+
+
 
      # Camera follow
     cam_offset = -220.0
@@ -108,7 +120,7 @@ def display():
 
     ufo_base.setup_camera()
     ufo_base.setup_lights()
-    ufo_base.draw_ground()
+    city.draw_city()
     ufo_base.draw_ufo()
     ufo_beam.draw_beam()
     abduction.draw_humans()
@@ -139,7 +151,8 @@ def reshape(w,h):
     glViewport(0,0,ufo_base.WIN_W,ufo_base.WIN_H)
 
 def main():
-    abduction.spawn_humans()
+    abduction.spawn_initial_humans()
+    city.init_city()
     glutInit()
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
     glutInitWindowSize(ufo_base.WIN_W, ufo_base.WIN_H)
