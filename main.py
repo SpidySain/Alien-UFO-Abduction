@@ -1,6 +1,4 @@
 
-# main.py
-# Combines UFO base, beam, and abduction features
 
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -13,6 +11,7 @@ import ufo_beam
 import abduction
 import city
 import random
+import magic_box
 
 
 keys_down = set()
@@ -74,13 +73,16 @@ def update(dt):
         ufo_beam.beam_cooldown_left = max(0.0, ufo_beam.beam_cooldown_left - dt)
     
 
-
-
     # Abduction check
     if ufo_beam.beam_active:
         h = max(1.0, pos[2])
         top_r = 6.0
         radius_ground = math.tan(math.radians(ufo_beam.beam_angle_deg)) * h + top_r
+        
+        # Abduction speed modifier
+        abduction_speed = 80.0
+        # TODO: 
+        
         for hmn in abduction.humans:
             if hmn['abducted']:
                 continue
@@ -91,9 +93,10 @@ def update(dt):
                 # target height = UFO belly
                 target_height = pos[2] - 6.0  
                 # move human upward gradually
-                hmn['lifted'] += 80.0 * dt  
+                hmn['lifted'] += abduction_speed * dt  
                 if hmn['lifted'] >= target_height:
                     hmn['lifted'] = target_height
+                    # TODO
                     hmn['abducted'] = True
                     abduction.score += 1
 
@@ -124,6 +127,7 @@ def display():
     ufo_base.draw_ufo()
     ufo_beam.draw_beam()
     abduction.draw_humans()
+    magic_box.draw_boxes()
 
     
     status = f" Score={abduction.score} | Humans left={sum(1 for h in abduction.humans if not h['abducted'])} | B=beam (CD {ufo_beam.beam_cooldown_left:0.1f}s) | L=land/ascend"
@@ -153,6 +157,7 @@ def reshape(w,h):
 def main():
     abduction.spawn_initial_humans()
     city.init_city()
+    magic_box.reset_boxes()  
     glutInit()
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
     glutInitWindowSize(ufo_base.WIN_W, ufo_base.WIN_H)
