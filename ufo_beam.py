@@ -25,7 +25,7 @@ beam_cooldown_left = 0.0
 beam_angle_deg = 18.0
 
 ufo_state = "flying"
-altitude_fly = 60.0
+altitude_fly = 160
 altitude_land = 18.0
 
 def draw_text_2d(x, y, s, font=GLUT_BITMAP_HELVETICA_18):
