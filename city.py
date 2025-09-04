@@ -1,6 +1,3 @@
-# city.py
-# Infinite procedural city generation
-
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
@@ -8,7 +5,7 @@ import random
 import ufo_beam 
 import ufo_base 
 
-# Parameters
+# Parameter
 CHUNK_SIZE = 200 
 BUILDINGS_PER_CHUNK = 15 
 TREES_PER_CHUNK = 10     
@@ -42,7 +39,7 @@ def generate_chunk(cx, cz):
         bz = rng.uniform(z_start, z_end)
         w = rng.randint(20, 40)
         d = rng.randint(20, 40)
-        h = rng.randint(20, int(ufo_beam.altitude_fly - 5))
+        h = rng.randint(20, int(ufo_beam.altitude_fly - 35))
         buildings.append((bx, bz, w, d, h))
 
     # Generate random trees
