@@ -35,10 +35,10 @@ def update(dt):
     if can_move and b's' in keys_down:
         pos[0] -= forward[0]*ufo_base.ufo_speed*dt
         pos[1] -= forward[1]*ufo_base.ufo_speed*dt
-    if can_move and b'a' in keys_down:
+    if can_move and b'd' in keys_down:
         pos[0] -= right[0]*ufo_base.ufo_speed*0.7*dt
         pos[1] -= right[1]*ufo_base.ufo_speed*0.7*dt
-    if can_move and b'd' in keys_down:
+    if can_move and b'a' in keys_down:
         pos[0] += right[0]*ufo_base.ufo_speed*0.7*dt
         pos[1] += right[1]*ufo_base.ufo_speed*0.7*dt
     if can_move and b'q' in keys_down:
@@ -112,27 +112,46 @@ def update(dt):
 def display():
     global last_time
     now = time.time()
-    if last_time is None: last_time = now
-    dt = min(0.05, now-last_time)
+    if last_time is None: 
+        last_time = now
+    dt = min(0.05, now - last_time)
     last_time = now
     update(dt)
 
-    glClearColor(0.05,0.06,0.09,1.0)
+    glClearColor(0.05, 0.06, 0.09, 1.0)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glEnable(GL_DEPTH_TEST)
-
+    
     ufo_base.setup_camera()
     ufo_base.setup_lights()
+
+    # City (lighting optional)
     city.draw_city()
+
+    # UFO (lighting ON → shading works)
+
+    # UFO (lighting ON → shading works)
+    glEnable(GL_LIGHTING)
     ufo_base.draw_ufo()
+
+    # Draw glowing windows separately (transparent, additive)
+    
+
+
+    # Beam (translucent → disable lighting so color stays bright)
+    glDisable(GL_LIGHTING)
     ufo_beam.draw_beam()
+    glEnable(GL_LIGHTING)
+
+    # Humans + boxes (with lighting if you want)
     abduction.draw_humans()
     magic_box.draw_boxes()
 
-    
+    # Status HUD
     status = f" Score={abduction.score} | Humans left={sum(1 for h in abduction.humans if not h['abducted'])} | B=beam (CD {ufo_beam.beam_cooldown_left:0.1f}s) | L=land/ascend"
     abduction.draw_text_2d(12, ufo_base.WIN_H-24, status, GLUT_BITMAP_HELVETICA_18)
     glutSwapBuffers()
+    
 
 def idle():
     glutPostRedisplay()
