@@ -1,6 +1,3 @@
-# ufo_beam.py
-# Step 2: landing + beam
-
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
@@ -13,7 +10,7 @@ keys_down = set()
 
 # ---------------- Beam Config ----------------
 beam_active = False
-beam_cooldown = 7.0
+beam_cooldown = 5.0
 beam_cooldown_left = 0.0
 
 beam_duration = 10.0   # <-- Beam stays active for 10 seconds
