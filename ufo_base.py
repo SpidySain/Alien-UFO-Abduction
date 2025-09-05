@@ -26,27 +26,6 @@ ufo_turn_speed = 100.0
 hover_amp = 6.0
 hover_speed = 2.0
 
-
-# ---------------- Utility ----------------
-def draw_text_2d(x, y, s, font=GLUT_BITMAP_HELVETICA_18):
-    """Draw 2D overlay text"""
-    glColor3f(1, 1, 1)
-    glMatrixMode(GL_PROJECTION)
-    glPushMatrix()
-    glLoadIdentity()
-    gluOrtho2D(0, WIN_W, 0, WIN_H)
-    glMatrixMode(GL_MODELVIEW)
-    glPushMatrix()
-    glLoadIdentity()
-    glRasterPos2f(x, y)
-    for ch in s:
-        glutBitmapCharacter(font, ord(ch))
-    glPopMatrix()
-    glMatrixMode(GL_PROJECTION)
-    glPopMatrix()
-    glMatrixMode(GL_MODELVIEW)
-
-
 def draw_ground():
     """Dark ground plane with grid lines"""
     glDisable(GL_LIGHTING)
