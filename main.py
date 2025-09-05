@@ -1,5 +1,3 @@
-
-
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
@@ -77,7 +75,30 @@ def update(dt):
     # Abduction check
     abduction.update_abductions(dt)
     abduction.update_human_movement(dt)
-
+    
+    # Magic box beam collection
+    if ufo_beam.beam_active:
+        h = max(1.0, pos[2])
+        top_r = 6.0
+        radius_ground = math.tan(math.radians(ufo_beam.beam_angle_deg)) * h + top_r
+        for box in magic_box.magic_boxes[:]:
+            if box['collected']:
+                continue
+            dx = box['x'] - pos[0]
+            dy = box['y'] - pos[1]
+            dist = math.hypot(dx, dy)
+            if dist <= radius_ground:
+                # Lift box upward gradually
+                box['lifted'] += 60.0 * dt
+                target_height = pos[2] - 6.0
+                if box['lifted'] >= target_height:
+                    box['lifted'] = target_height
+                    box['collected'] = True
+                    magic_box.apply_effect(box)
+                    # Remove collected box
+                    if box in magic_box.magic_boxes:
+                        magic_box.magic_boxes.remove(box)
+                    print(f"[Magic Box] Box collected via beam!")
 
      # Camera follow
     cam_offset = -220.0
@@ -95,7 +116,6 @@ def display():
     last_time = now
     update(dt)
 
-    # --- NEW: query window size ---
     w = glutGet(GLUT_WINDOW_WIDTH)
     h = glutGet(GLUT_WINDOW_HEIGHT)
     ufo_base.WIN_W, ufo_base.WIN_H = max(1, w), max(1, h)
@@ -114,15 +134,14 @@ def display():
         city.draw_city()
         glEnable(GL_LIGHTING)
         ufo_base.draw_ufo()
-        abduction.draw_humans()   # draw humans first
+        abduction.draw_humans()
         glDisable(GL_LIGHTING)
-        ufo_beam.draw_beam()      # then draw transparent beam on top
+        ufo_beam.draw_beam() 
         glEnable(GL_LIGHTING)
         magic_box.draw_boxes()
 
 
         # Beam status string
-# Beam status string
         if ufo_beam.beam_active:
             beam_status = f"Beam active: {ufo_beam.beam_timer:.1f}s"
         elif ufo_beam.beam_cooldown_left > 0:
@@ -143,7 +162,6 @@ def display():
 
 
     else:
-        # draw the menu overlay
         menu.draw_menu()
 
     glutSwapBuffers()
@@ -194,7 +212,7 @@ def on_mouse(button, state, x, y):
 
 
 def main():
-    menu.restart_game()   # Initialize everything
+    menu.restart_game()
     glutInit()
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
     glutInitWindowSize(ufo_base.WIN_W, ufo_base.WIN_H)
