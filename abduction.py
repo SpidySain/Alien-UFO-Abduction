@@ -30,7 +30,18 @@ def spawn_humans_in_chunk(cx, cz):
     for _ in range(HUMANS_PER_CHUNK):
         x = rng.uniform(x_start, x_end)
         y = rng.uniform(z_start, z_end)
-        humans.append({'x': x, 'y': y, 'lifted': 0.0, 'abducted': False})
+        humans.append({
+            'x': x,
+            'y': y,
+            'lifted': 0.0,
+            'abducted': False,
+            'vx': rng.uniform(-20, 20),
+            'vy': rng.uniform(-20, 20),
+            'dir_change_time': rng.uniform(2, 5),
+            'panic': False   # new flag
+        })
+
+
 
 def spawn_initial_humans():
     global humans, score, spawned_human_chunks
@@ -50,6 +61,48 @@ def update_humans():
             cx, cz = chunk_key
             spawn_humans_in_chunk(cx, cz)
             spawned_human_chunks.add(chunk_key)
+
+def update_human_movement(dt):
+    """Update humans: wander randomly, but run from UFO if too close.
+       If being abducted (lifted > 0), they stop moving.
+    """
+    ufo_x, ufo_y, ufo_z = ufo_base.ufo_pos
+
+    for h in humans:
+        if h['abducted']:
+            continue  # abducted humans don't move at all
+
+        # 🚨 NEW: If being lifted, freeze movement
+        if h['lifted'] > 0.0:
+            h['vx'] = 0.0
+            h['vy'] = 0.0
+            continue
+
+        dx = h['x'] - ufo_x
+        dy = h['y'] - ufo_y
+        dist = math.sqrt(dx*dx + dy*dy)
+
+        # --- Panic mode if UFO is close ---
+        if dist < 120:  # panic radius
+            h['panic'] = True
+            angle = math.atan2(dy, dx)  # away from UFO
+            speed = 50.0  # faster run speed
+            h['vx'] = math.cos(angle) * speed
+            h['vy'] = math.sin(angle) * speed
+        else:
+            h['panic'] = False
+            # --- Normal wandering ---
+            h['dir_change_time'] -= dt
+            if h['dir_change_time'] <= 0:
+                angle = rng.uniform(0, 2 * math.pi)
+                speed = rng.uniform(10, 25)  # walking speed
+                h['vx'] = math.cos(angle) * speed
+                h['vy'] = math.sin(angle) * speed
+                h['dir_change_time'] = rng.uniform(2, 5)
+
+        # Apply movement
+        h['x'] += h['vx'] * dt
+        h['y'] += h['vy'] * dt
 
 # Keep existing drawing code
 def draw_text_2d(x, y, s, font=GLUT_BITMAP_HELVETICA_18):
@@ -81,7 +134,7 @@ def draw_text_2d(x, y, s, font=GLUT_BITMAP_HELVETICA_18):
     glColor3f(1.0, 1.0, 1.0)
 
     # Draw text — raster pos uses the same coordinate system as the ortho above.
-    # Note: y origin is bottom-left, so pass (WIN_H - margin) if you want top-left.
+ 
     glRasterPos2f(x, y)
     for ch in s:
         glutBitmapCharacter(font, ord(ch))
@@ -101,15 +154,48 @@ def draw_text_2d(x, y, s, font=GLUT_BITMAP_HELVETICA_18):
 def draw_human(h):
     glPushMatrix()
     glTranslatef(h['x'], h['y'], h['lifted'])
-    glColor3f(0.9, 0.8, 0.7)
+
+    # --- Body ---
+    glColor3f(0.8, 0.7, 0.6)  # skin tone for simplicity
     glPushMatrix()
-    glTranslatef(0,0,6)
-    gluCylinder(gluNewQuadric(), 2.0, 2.0, 12.0, 8, 1)
+    glTranslatef(0, 0, 6)
+    gluCylinder(gluNewQuadric(), 2.0, 2.0, 12.0, 8, 1)  # torso
     glPopMatrix()
+
+    # --- Head ---
     glColor3f(0.95, 0.85, 0.7)
-    glTranslatef(0,0,18)
-    glutSolidSphere(3.5, 10, 10)
+    glPushMatrix()
+    glTranslatef(0, 0, 20)
+    glutSolidSphere(3.5, 12, 12)
     glPopMatrix()
+
+    # --- Arms ---
+    glColor3f(0.8, 0.7, 0.6)
+    glPushMatrix()
+    glTranslatef(0, 0, 14)       # shoulder height
+    glRotatef(90, 0, 1, 0)       # rotate cylinder sideways
+    gluCylinder(gluNewQuadric(), 0.8, 0.8, 8.0, 8, 1)  # right arm
+    glPopMatrix()
+
+    glPushMatrix()
+    glTranslatef(0, 0, 14)
+    glRotatef(-90, 0, 1, 0)
+    gluCylinder(gluNewQuadric(), 0.8, 0.8, 8.0, 8, 1)  # left arm
+    glPopMatrix()
+
+    # --- Legs ---
+    glPushMatrix()
+    glTranslatef(-1.0, 0, 0)     # left leg
+    gluCylinder(gluNewQuadric(), 1.0, 1.0, 6.0, 8, 1)
+    glPopMatrix()
+
+    glPushMatrix()
+    glTranslatef(1.0, 0, 0)      # right leg
+    gluCylinder(gluNewQuadric(), 1.0, 1.0, 6.0, 8, 1)
+    glPopMatrix()
+
+    glPopMatrix()
+
 
 def draw_humans():
     update_humans()
