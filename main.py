@@ -1,3 +1,5 @@
+
+
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
@@ -10,12 +12,14 @@ import abduction
 import city
 import random
 import magic_box
-
+import menu
 
 keys_down = set()
 last_time = None
 
 def update(dt):
+    if menu.game_state != "playing":
+        return
     global keys_down
     # Ensure we modify the shared UFO state
     pos = ufo_base.ufo_pos
@@ -67,38 +71,11 @@ def update(dt):
         pos[2] = ufo_beam.altitude_fly + math.sin(t*2*math.pi*ufo_base.hover_speed)*ufo_base.hover_amp
 
     # beam cooldown ticking
-    if ufo_beam.beam_cooldown_left > 0.0:
-        ufo_beam.beam_cooldown_left = max(0.0, ufo_beam.beam_cooldown_left - dt)
+    ufo_beam.update_beam(dt)
+
     
-
     # Abduction check
-    if ufo_beam.beam_active:
-        h = max(1.0, pos[2])
-        top_r = 6.0
-        radius_ground = math.tan(math.radians(ufo_beam.beam_angle_deg)) * h + top_r
-        
-        # Abduction speed modifier
-        abduction_speed = 80.0
-        # TODO: 
-        
-        for hmn in abduction.humans:
-            if hmn['abducted']:
-                continue
-            dx = hmn['x'] - pos[0]
-            dy = hmn['y'] - pos[1]
-            dist = math.hypot(dx, dy)
-            if dist <= radius_ground:
-                # target height = UFO belly
-                target_height = pos[2] - 6.0  
-                # move human upward gradually
-                hmn['lifted'] += abduction_speed * dt  
-                if hmn['lifted'] >= target_height:
-                    hmn['lifted'] = target_height
-                    # TODO
-                    hmn['abducted'] = True
-                    abduction.score += 1
-
-
+    abduction.update_abductions(dt)
 
      # Camera follow
     cam_offset = -220.0
@@ -119,62 +96,97 @@ def display():
     glClearColor(0.05, 0.06, 0.09, 1.0)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glEnable(GL_DEPTH_TEST)
-    
-    ufo_base.setup_camera()
-    ufo_base.setup_lights()
 
-    # City (lighting optional)
-    city.draw_city()
+    if menu.game_state == "playing":
+        # draw your UFO world
+        ufo_base.setup_camera()
+        ufo_base.setup_lights()
+        city.draw_city()
+        glEnable(GL_LIGHTING)
+        ufo_base.draw_ufo()
+        glDisable(GL_LIGHTING)
+        ufo_beam.draw_beam()
+        glEnable(GL_LIGHTING)
+        abduction.draw_humans()
+        magic_box.draw_boxes()
 
-    # UFO (lighting ON → shading works)
+        # Beam status string
+# Beam status string
+        if ufo_beam.beam_active:
+            beam_status = f"Beam active: {ufo_beam.beam_timer:.1f}s"
+        elif ufo_beam.beam_cooldown_left > 0:
+            beam_status = f"Cooldown: {ufo_beam.beam_cooldown_left:.1f}s"
+        else:
+            beam_status = "Beam ready"
 
-    # UFO (lighting ON → shading works)
-    glEnable(GL_LIGHTING)
-    ufo_base.draw_ufo()
+        # Final status text
+        status = (
+            f"Score={abduction.score} | "
+            f"Humans left={sum(1 for h in abduction.humans if not h['abducted'])} | "
+            f"{beam_status} | B=beam | L=land/K=ascend"
+        )
 
-    # Draw glowing windows separately (transparent, additive)
-    
+        abduction.draw_text_2d(12, ufo_base.WIN_H - 24, status, GLUT_BITMAP_HELVETICA_18)
 
 
-    # Beam (translucent → disable lighting so color stays bright)
-    glDisable(GL_LIGHTING)
-    ufo_beam.draw_beam()
-    glEnable(GL_LIGHTING)
 
-    # Humans + boxes (with lighting if you want)
-    abduction.draw_humans()
-    magic_box.draw_boxes()
 
-    # Status HUD
-    status = f" Score={abduction.score} | Humans left={sum(1 for h in abduction.humans if not h['abducted'])} | B=beam (CD {ufo_beam.beam_cooldown_left:0.1f}s) | L=land/ascend"
-    abduction.draw_text_2d(12, ufo_base.WIN_H-24, status, GLUT_BITMAP_HELVETICA_18)
+    else:
+        # draw the menu overlay
+        menu.draw_menu()
+
     glutSwapBuffers()
+
     
 
 def idle():
     glutPostRedisplay()
 
 def on_key_down(key, x, y):
-    keys_down.add(key)
+    global keys_down
+
+    # ESC key → toggle menu/pause
     if key == b'\x1b':
-        glutLeaveMainLoop()
+        if menu.game_state == "playing":
+            menu.game_state = "menu"
+        else:
+            menu.game_state = "playing"
+
+    # If we are in menu mode, ignore other inputs
+    if menu.game_state != "playing":
+        return
+
+    # Add pressed key to active set
+    keys_down.add(key)
+
+    # Toggle UFO beam
     if key == b'b':
-        ufo_beam.try_toggle_beam() 
+        ufo_beam.try_toggle_beam()
+
+    # Restart game instantly
     if key == b'r':
-        abduction.spawn_humans()
+        menu.restart_game()
+
+    # Landing and ascending
+    if key == b'l' and ufo_beam.ufo_state == "flying":
+        ufo_beam.ufo_state = "landing"
+    if key == b'k' and ufo_beam.ufo_state == "landed":
+        ufo_beam.ufo_state = "ascending"
+
 
 def on_key_up(key, x, y):
     if key in keys_down: keys_down.remove(key)
 
+def on_mouse(button, state, x, y):
+    if menu.game_state in ["menu", "paused", "gameover"] and button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
+        menu.handle_menu_click(x, y)
 def reshape(w,h):
     ufo_base.WIN_W, ufo_base.WIN_H = max(1,w), max(1,h)
     ufo_base.ASPECT = ufo_base.WIN_W/float(ufo_base.WIN_H)
     glViewport(0,0,ufo_base.WIN_W,ufo_base.WIN_H)
 
 def main():
-    abduction.spawn_initial_humans()
-    city.init_city()
-    magic_box.reset_boxes()  
+    menu.restart_game()   # Initialize everything
     glutInit()
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
     glutInitWindowSize(ufo_base.WIN_W, ufo_base.WIN_H)
@@ -183,6 +195,7 @@ def main():
     glutIdleFunc(idle)
     glutKeyboardFunc(on_key_down)
     glutKeyboardUpFunc(on_key_up)
+    glutMouseFunc(on_mouse)
     glutReshapeFunc(reshape)
     glutMainLoop()
 
