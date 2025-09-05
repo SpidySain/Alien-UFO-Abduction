@@ -76,6 +76,8 @@ def update(dt):
     
     # Abduction check
     abduction.update_abductions(dt)
+    abduction.update_human_movement(dt)
+
 
      # Camera follow
     cam_offset = -220.0
@@ -93,6 +95,14 @@ def display():
     last_time = now
     update(dt)
 
+    # --- NEW: query window size ---
+    w = glutGet(GLUT_WINDOW_WIDTH)
+    h = glutGet(GLUT_WINDOW_HEIGHT)
+    ufo_base.WIN_W, ufo_base.WIN_H = max(1, w), max(1, h)
+    ufo_base.ASPECT = ufo_base.WIN_W / float(ufo_base.WIN_H)
+    glViewport(0, 0, ufo_base.WIN_W, ufo_base.WIN_H)
+
+    # Clear screen
     glClearColor(0.05, 0.06, 0.09, 1.0)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glEnable(GL_DEPTH_TEST)
@@ -104,11 +114,12 @@ def display():
         city.draw_city()
         glEnable(GL_LIGHTING)
         ufo_base.draw_ufo()
+        abduction.draw_humans()   # draw humans first
         glDisable(GL_LIGHTING)
-        ufo_beam.draw_beam()
+        ufo_beam.draw_beam()      # then draw transparent beam on top
         glEnable(GL_LIGHTING)
-        abduction.draw_humans()
         magic_box.draw_boxes()
+
 
         # Beam status string
 # Beam status string
@@ -180,10 +191,7 @@ def on_key_up(key, x, y):
 def on_mouse(button, state, x, y):
     if menu.game_state in ["menu", "paused", "gameover"] and button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
         menu.handle_menu_click(x, y)
-def reshape(w,h):
-    ufo_base.WIN_W, ufo_base.WIN_H = max(1,w), max(1,h)
-    ufo_base.ASPECT = ufo_base.WIN_W/float(ufo_base.WIN_H)
-    glViewport(0,0,ufo_base.WIN_W,ufo_base.WIN_H)
+
 
 def main():
     menu.restart_game()   # Initialize everything
@@ -196,7 +204,7 @@ def main():
     glutKeyboardFunc(on_key_down)
     glutKeyboardUpFunc(on_key_up)
     glutMouseFunc(on_mouse)
-    glutReshapeFunc(reshape)
+    
     glutMainLoop()
 
 if __name__ == "__main__":
