@@ -4,7 +4,7 @@ from OpenGL.GLUT import *
 from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18
 import math, time, random
 import city
-import ufo_base
+import ufo_base, ufo_beam
 
 WIN_W, WIN_H = 1000, 800
 
@@ -53,15 +53,50 @@ def update_humans():
 
 # Keep existing drawing code
 def draw_text_2d(x, y, s, font=GLUT_BITMAP_HELVETICA_18):
-    glColor3f(1,1,1)
-    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity()
-    gluOrtho2D(0, WIN_W, 0, WIN_H)
-    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity()
-    glRasterPos2f(x, y)
-    for ch in s: glutBitmapCharacter(font, ord(ch))
-    glPopMatrix()
-    glMatrixMode(GL_PROJECTION); glPopMatrix()
+    """
+    Draw 2D overlay text at window coords (0,0) bottom-left.
+    Uses ufo_base.WIN_W / WIN_H so it adapts to window resize.
+    """
+    # Save enable states so we can restore them exactly
+    depth_was = glIsEnabled(GL_DEPTH_TEST)
+    light_was = glIsEnabled(GL_LIGHTING)
+    tex_was   = glIsEnabled(GL_TEXTURE_2D)
+
+    # Force overlay mode (always on top)
+    if depth_was: glDisable(GL_DEPTH_TEST)
+    if light_was: glDisable(GL_LIGHTING)
+    if tex_was:   glDisable(GL_TEXTURE_2D)
+
+    # Setup orthographic projection matching window coords
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    gluOrtho2D(0, max(1, int(ufo_base.WIN_W)), 0, max(1, int(ufo_base.WIN_H)))
+
     glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+
+    # Make sure the color is white (or whatever you want)
+    glColor3f(1.0, 1.0, 1.0)
+
+    # Draw text — raster pos uses the same coordinate system as the ortho above.
+    # Note: y origin is bottom-left, so pass (WIN_H - margin) if you want top-left.
+    glRasterPos2f(x, y)
+    for ch in s:
+        glutBitmapCharacter(font, ord(ch))
+
+    # Restore matrices
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+
+    # Restore enable states
+    if tex_was:   glEnable(GL_TEXTURE_2D)
+    if light_was: glEnable(GL_LIGHTING)
+    if depth_was: glEnable(GL_DEPTH_TEST)
+
 
 def draw_human(h):
     glPushMatrix()
@@ -81,3 +116,48 @@ def draw_humans():
     for h in humans:
         if not h['abducted']:
             draw_human(h)
+
+
+def update_abductions(dt):
+    """Update human abductions when beam is active."""
+    if not ufo_beam.beam_active:
+        return
+
+    ufo_x, ufo_y, ufo_z = ufo_base.ufo_pos
+    beam_angle = math.radians(ufo_beam.beam_angle_deg)
+    abduction_speed = 140
+
+    # Beam axis = pointing down (negative Z)
+    axis = (0.0, 0.0, -1.0)
+
+    for hmn in humans:
+        if hmn['abducted']:
+            continue
+
+        # Vector from UFO to human (using current lifted height for z)
+        dx = hmn['x'] - ufo_x
+        dy = hmn['y'] - ufo_y
+        dz = hmn['lifted'] - ufo_z  # human below UFO = negative
+
+        if dz < 0:  # must be below UFO
+            length = math.sqrt(dx*dx + dy*dy + dz*dz)
+            if length == 0:
+                continue
+
+            # Normalize vector
+            vx, vy, vz = dx/length, dy/length, dz/length
+
+            # Dot product with axis (0,0,-1)
+            dot = vx*axis[0] + vy*axis[1] + vz*axis[2]
+            dot = max(-1.0, min(1.0, dot))  # clamp
+            angle = math.acos(dot)
+
+            if angle <= beam_angle:  # Inside cone
+                target_height = ufo_z - 40.0
+                hmn['lifted'] += abduction_speed * dt
+
+                if hmn['lifted'] >= target_height:
+                    hmn['lifted'] = target_height
+                    hmn['abducted'] = True
+                    global score
+                    score += 1
