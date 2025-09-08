@@ -12,10 +12,10 @@ fovY = 90
 cam_pos = [0.0, -300.0, 160.0]
 cam_look = [0.0, 0.0, 40.0]
 
-# ---------------- Ground ----------------
+#  Ground 
 GROUND_SIZE = 1200
 
-# ---------------- UFO ----------------
+#  UFO 
 ufo_pos = [0.0, 0.0, 60.0]
 ufo_yaw = 0.0
 ufo_speed = 140.0
@@ -25,7 +25,7 @@ hover_speed = 2.0
 
 
 
-# ---------------- UFO Model ----------------
+#  UFO Model 
 
 def draw_ufo_opaque():
     glPushMatrix()
@@ -91,7 +91,7 @@ def draw_ufo():
     draw_ufo_windows()     
 
 
-# ---------------- Lighting ----------------
+#  Lighting 
 def setup_lights():
     glEnable(GL_LIGHTING)
     glEnable(GL_LIGHT0)
@@ -113,7 +113,7 @@ def setup_lights():
     glEnable(GL_NORMALIZE)
 
 
-# ---------------- Camera ----------------
+#Camera 
 def setup_camera():
     glMatrixMode(GL_PROJECTION)
     glLoadIdentity()
@@ -135,7 +135,7 @@ def setup_camera():
 last_time = None
 keys_down = set()
 
-# ---------------- Beam Config ----------------
+# Beam Config 
 beam_active = False
 beam_cooldown = 5.0
 beam_cooldown_left = 0.0
@@ -144,7 +144,7 @@ beam_duration = 10.0
 beam_timer = 0.0      
 beam_angle_deg = 18.0
 
-# ---------------- UFO States ----------------
+# UFO States 
 ufo_state = "flying"
 altitude_fly = 160
 altitude_land = 18.0
@@ -400,7 +400,7 @@ def draw_human(h):
     glColor3f(0.8, 0.7, 0.6)  
     glPushMatrix()
     glTranslatef(0, 0, 6)
-    gluCylinder(gluNewQuadric(), 2.0, 2.0, 12.0, 8, 1)  # torso
+    gluCylinder(gluNewQuadric(), 2.0, 2.0, 12.0, 8, 1) 
     glPopMatrix()
 
     # --- Head ---
@@ -831,7 +831,7 @@ def reset_boxes():
 
 # --------- UFO Health ----------
 ufo_max_health = 100
-ufo_health = 100.0
+ufo_health = 500.0
 
 def reset_ufo_health():
     global ufo_health
@@ -1093,10 +1093,10 @@ def draw_projectiles():
 
 #################################################
 
-# menu.py
 
-# ------------------ MENU STATE ------------------
-game_state = "menu"   # menu | playing | paused | gameover
+
+#  MENU STATE 
+game_state = "menu"   
 
 menu_buttons = [
     {"label": "Play",  "x": 400, "y": 500, "w": 200, "h": 50, "action": "resume"},
@@ -1104,7 +1104,7 @@ menu_buttons = [
     {"label": "Exit",    "x": 400, "y": 340, "w": 200, "h": 50, "action": "exit"},
 ]
 
-# ------------------ DRAWING ------------------
+# DRAWING 
 def draw_text(x, y, text):
     glColor3f(1, 1, 1)
     glRasterPos2f(x, y)
@@ -1136,12 +1136,12 @@ def draw_menu():
     glLoadIdentity()
 
     glDisable(GL_LIGHTING)
-    glDisable(GL_DEPTH_TEST)   # <-- IMPORTANT: draw always on top
+    glDisable(GL_DEPTH_TEST)   
 
     for btn in menu_buttons:
         draw_button(btn)
 
-    glEnable(GL_DEPTH_TEST)    # restore
+    glEnable(GL_DEPTH_TEST)
     glEnable(GL_LIGHTING)
 
     glPopMatrix()
@@ -1150,7 +1150,7 @@ def draw_menu():
     glMatrixMode(GL_MODELVIEW)
 
 
-# ------------------ LOGIC ------------------
+#  LOGIC 
 def restart_game():
     global ufo_yaw, ufo_state, beam_active, score
     spawn_initial_humans()
@@ -1162,7 +1162,7 @@ def restart_game():
     beam_active = False
     score = 0
     print("[Game] Restarted")
-    # --- Added for enemies/health ---
+    # Added for enemies/health
     reset_enemies_and_projectiles()
     reset_ufo_health()
 
@@ -1272,7 +1272,7 @@ def update(dt):
                         magic_boxes.remove(box)
                     print(f"[Magic Box] Box collected via beam!")
 
-    # --- Enemies & projectiles ---
+    # Enemies & projectiles
     update_enemy_spawning(dt)
     update_enemies(dt)
     update_projectiles(dt)
