@@ -480,7 +480,7 @@ TREES_PER_CHUNK = 10
 generated_chunks = set()
 buildings = []
 trees = []
-
+MAX_BUILDING_HEIGHT=80
 # Random generator seed (can be fixed for consistency)
 rng = random.Random(42)
 
@@ -505,7 +505,7 @@ def generate_chunk(cx, cz):
         bz = rng.uniform(z_start, z_end)
         w = rng.randint(20, 40)
         d = rng.randint(20, 40)
-        h = rng.randint(20, int(altitude_fly - 35))
+        h = rng.randint(20, MAX_BUILDING_HEIGHT)
         buildings.append((bx, bz, w, d, h))
 
     # Generate random trees
