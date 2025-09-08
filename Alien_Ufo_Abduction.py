@@ -1294,8 +1294,8 @@ def display():
     last_time = now
     update(dt)
 
-    w = glutGet(GLUT_WINDOW_WIDTH)
-    h = glutGet(GLUT_WINDOW_HEIGHT)
+    w = WIN_W
+    h = WIN_H
 
     glViewport(0, 0, WIN_W, WIN_H)
 
@@ -1305,23 +1305,23 @@ def display():
     glEnable(GL_DEPTH_TEST)
 
     if game_state == "playing":
-        # draw your UFO world
+       
         setup_camera()
         setup_lights()
         draw_city()
         glEnable(GL_LIGHTING)
         draw_ufo()
-        draw_ufo_healthbar()      # <<< added
+        draw_ufo_healthbar()      
         draw_humans()
-        draw_enemies()            # <<< added
+        draw_enemies()            
         glDisable(GL_LIGHTING)
         draw_beam() 
-        draw_projectiles()        # <<< added
+        draw_projectiles()        
         glEnable(GL_LIGHTING)
         draw_boxes()
 
 
-        # Beam status string
+     
         if beam_active:
             beam_status = f"Beam active: {beam_timer:.1f}s"
         elif beam_cooldown_left > 0:
@@ -1329,10 +1329,10 @@ def display():
         else:
             beam_status = "Beam ready"
 
-     # Final status text
+   
         status = (
             f"Score={score} | "
-            f"HP={int(ufo_health)}/{ufo_max_health} | "  # <<< added
+            f"HP={int(ufo_health)}/{ufo_max_health} | "  
             f"Humans left={sum(1 for h in humans if not h['abducted'])} | "
             f"{beam_status} | B=beam | L=land/K=ascend"
             )
@@ -1353,29 +1353,29 @@ def idle():
 def on_key_down(key, x, y):
     global keys_down, ufo_state, game_state
 
-    # ESC key → toggle menu/pause
+   
     if key == b'\x1b':
         if game_state == "playing":
             game_state = "menu"
         else:
             game_state = "playing"
 
-    # If we are in menu mode, ignore other inputs
+   
     if game_state != "playing":
         return
 
-    # Add pressed key to active set
+  
     keys_down.add(key)
 
-    # Toggle UFO beam
+ 
     if key == b'b':
         try_toggle_beam()
 
-    #Restart game instantly
+  
     if key == b'r':
         restart_game()
 
-    #Landing and ascending
+   
     if key == b'l' and ufo_state == "flying":
         ufo_state = "landing"
     if key == b'k' and ufo_state == "landed":
