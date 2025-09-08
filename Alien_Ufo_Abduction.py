@@ -505,7 +505,7 @@ def generate_chunk(cx, cz):
         bz = rng.uniform(z_start, z_end)
         w = rng.randint(20, 40)
         d = rng.randint(20, 40)
-        h = rng.randint(20, int(altitude_fly - 35))
+        h = rng.randint(20, MAX_BUILDING_HEIGHT)
         buildings.append((bx, bz, w, d, h))
 
     # Generate random trees
