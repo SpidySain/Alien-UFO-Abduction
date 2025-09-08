@@ -1,6 +1,3 @@
-# ufo_base.py
-# Step 1: UFO model, ground, camera, movement
-
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
@@ -496,6 +493,414 @@ def update_abductions(dt):
 
 
 
+###############################################
+
+# Parameter
+CHUNK_SIZE = 200 
+BUILDINGS_PER_CHUNK = 15 
+TREES_PER_CHUNK = 10     
+
+# Track generated chunks to avoid duplicates
+generated_chunks = set()
+buildings = []
+trees = []
+
+# Random generator seed (can be fixed for consistency)
+rng = random.Random(42)
+
+def chunk_key(x, z):
+    """Get the chunk grid coordinate for a world position."""
+    cx = int(x // CHUNK_SIZE)
+    cz = int(z // CHUNK_SIZE)
+    return (cx, cz)
+
+def generate_chunk(cx, cz):
+    """Generate buildings and trees in a given chunk."""
+    global buildings, trees
+
+    x_start = cx * CHUNK_SIZE
+    z_start = cz * CHUNK_SIZE
+    x_end = x_start + CHUNK_SIZE
+    z_end = z_start + CHUNK_SIZE
+
+    # Generate random buildings
+    for _ in range(BUILDINGS_PER_CHUNK):
+        bx = rng.uniform(x_start, x_end)
+        bz = rng.uniform(z_start, z_end)
+        w = rng.randint(20, 40)
+        d = rng.randint(20, 40)
+        h = rng.randint(20, int(altitude_fly - 35))
+        buildings.append((bx, bz, w, d, h))
+
+    # Generate random trees
+    for _ in range(TREES_PER_CHUNK):
+        tx = rng.uniform(x_start, x_end)
+        tz = rng.uniform(z_start, z_end)
+        trees.append((tx, tz))
+
+def init_city():
+    """Initialize the starting city area around (0,0)."""
+    global generated_chunks, buildings, trees
+    buildings = []
+    trees = []
+    generated_chunks.clear()
+
+    # Pre-generate central area
+    center_range = 2
+    for dx in range(-center_range, center_range + 1):
+        for dz in range(-center_range, center_range + 1):
+            generate_chunk(dx, dz)
+            generated_chunks.add((dx, dz))
+
+def update_city():
+    """Add new chunks based on UFO position."""
+    global generated_chunks
+
+    ufo_x = ufo_pos[0]
+    ufo_z = ufo_pos[1]
+
+    # Determine current chunk
+    center_cx = int(ufo_x // CHUNK_SIZE)
+    center_cz = int(ufo_z // CHUNK_SIZE)
+
+    radius = 3
+
+    # Generate nearby chunks if not already done
+    for dx in range(-radius, radius + 1):
+        for dz in range(-radius, radius + 1):
+            cx = center_cx + dx
+            cz = center_cz + dz
+            if (cx, cz) not in generated_chunks:
+                generate_chunk(cx, cz)
+                generated_chunks.add((cx, cz))
+
+def draw_ground():
+    """Draw infinite ground with repeating grid."""
+    glColor3f(0.12, 0.14, 0.18)
+    glBegin(GL_QUADS)
+    s = 10000
+    glVertex3f(-s, -s, 0)
+    glVertex3f( s, -s, 0)
+    glVertex3f( s,  s, 0)
+    glVertex3f(-s,  s, 0)
+    glEnd()
+
+    # Grid lines
+    glLineWidth(1)
+    glColor3f(0.25, 0.28, 0.33)
+    glBegin(GL_LINES)
+    step = 60
+    for x in range(-s, s + 1, step):
+        glVertex3f(x, -s, 0)
+        glVertex3f(x, s, 0)
+    for z in range(-s, s + 1, step):
+        glVertex3f(-s, z, 0)
+        glVertex3f(s, z, 0)
+    glEnd()
+
+def draw_buildings():
+    glColor3f(0.5, 0.5, 0.7)
+    for (x, y, w, d, h) in buildings:
+        glPushMatrix()
+        glTranslatef(x, y, h / 2)
+        glScalef(w, d, h)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+def draw_trees():
+    for (x, y) in trees:
+        # Trunk
+        glColor3f(0.55, 0.27, 0.07)
+        glPushMatrix()
+        glTranslatef(x, y, 5)
+        glRotatef(-90, 1, 0, 0)
+        quad = gluNewQuadric()
+        gluCylinder(quad, 2, 2, 10, 8, 8)
+        glPopMatrix()
+
+        # Leaves
+        glColor3f(0.0, 0.6, 0.0)
+        glPushMatrix()
+        glTranslatef(x, y, 15)
+        glutSolidSphere(6, 12, 12)
+        glPopMatrix()
+
+def draw_city():
+    """Main draw function — updates city then renders."""
+    update_city()
+    draw_ground()
+    draw_buildings()
+    draw_trees()
+
+######################################################
+
+
+
+MAGIC_BOX_SIZE = 8.0
+MAX_BOXES = 25 
+SPAWN_INTERVAL = 10.0
+last_spawn_time = 0
+
+magic_boxes = []
+box_counter = 0 
+
+POWER_UPS = [
+    "beam_wider",
+    "beam_stronger",
+    "cooldown_reset",
+    "score_bonus"
+]
+
+TRAPS = [
+    "beam_narrow",     
+    "beam_slower",     
+    "cooldown_extend", 
+    "fake_abduction"   
+]
+
+def spawn_box():
+    """Spawn a magic box on the ground surface."""
+    global box_counter
+    ufo_x, ufo_y, ufo_z = ufo_pos
+    
+    # Spawn box on ground in a ring around the UFO (30-80 units away)
+    angle = random.uniform(0, 2 * math.pi)
+    distance = random.uniform(30, 80)
+    
+    box_x = ufo_x + math.cos(angle) * distance
+    box_y = ufo_y + math.sin(angle) * distance
+    box_z = 4.0
+    
+    # 70% chance of power-up, 30% trap
+    if random.random() < 0.7:
+        box_type = "power_up"
+        effect = random.choice(POWER_UPS)
+    else:
+        box_type = "trap"
+        effect = random.choice(TRAPS)
+    
+    box_counter += 1
+    new_box = {
+        'id': box_counter,
+        'x': box_x,
+        'y': box_y,
+        'z': box_z,
+        'type': box_type,
+        'effect': effect,
+        'collected': False,
+        'spawn_time': time.time(),
+        'life_time': 25.0,
+        'lifted': 0.0  
+    }
+    
+    magic_boxes.append(new_box)
+    print(f"[Magic Box] Spawned {box_type} box (ID: {new_box['id']}) at ({box_x:.1f}, {box_y:.1f})")
+
+def apply_effect(box):
+    """Apply the effect of the collected box."""
+    global beam_angle_deg, beam_cooldown_left, score
+    effect = box['effect']
+    box_type = "Power-up" if box['type'] == "power_up" else "Trap"
+    effect_name = effect.replace('_', ' ').title()
+    print(f"[Magic Box] Collected: {box_type} - {effect_name}")
+    
+    if effect == "beam_wider":
+        beam_angle_deg = min(45.0, beam_angle_deg + 5.0)
+    elif effect == "beam_narrow":
+        beam_angle_deg = max(5.0, beam_angle_deg - 5.0)
+    elif effect == "beam_stronger":
+        pass
+    elif effect == "beam_slower":
+        pass
+    elif effect == "cooldown_reset":
+        beam_cooldown_left = 0.0
+    elif effect == "cooldown_extend":
+        beam_cooldown_left += 5.0
+    elif effect == "score_bonus":
+        score += 15
+    elif effect == "fake_abduction":
+        pass
+
+def update_boxes():
+    """Update box logic every frame."""
+    global magic_boxes, last_spawn_time
+    
+    current_time = time.time()
+    
+    # Spawn new box periodically
+    if len(magic_boxes) < MAX_BOXES and (current_time - last_spawn_time) > SPAWN_INTERVAL:
+        spawn_box()
+        last_spawn_time = current_time
+    
+    # Update existing boxes
+    for box in magic_boxes[:]:
+        if box['collected']:
+            continue
+            
+        if (current_time - box['spawn_time']) > box['life_time']:
+            magic_boxes.remove(box)
+            print(f"[Magic Box] Box {box['id']} expired")
+            continue
+
+def draw_box(box):
+    """Draw a colorful magic box on the ground."""
+    glPushMatrix()
+    glTranslatef(box['x'], box['y'], box['z'] + box['lifted'])
+    
+    # Pulsing effect
+    pulse = (math.sin(time.time() * 3 + box['id']) + 1) * 0.5
+    scale = 1.0 + pulse * 0.2
+    
+    glScalef(scale, scale, scale)
+    if box['type'] == "power_up":
+        glColor3f(0.0, 0.9, 0.0) 
+    else:
+        glColor3f(0.9, 0.0, 0.0) 
+    
+    # Draw main cube
+    glutSolidCube(MAGIC_BOX_SIZE)
+    
+    # Draw wireframe outline for visibility
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+    glLineWidth(2.0)
+    if box['type'] == "power_up":
+        glColor3f(0.7, 1.0, 0.7)
+    else:
+        glColor3f(1.0, 0.7, 0.7)
+    glutSolidCube(MAGIC_BOX_SIZE + 1.0)
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+    
+    # Draw symbol on top
+    glTranslatef(0, 0, MAGIC_BOX_SIZE/2 + 1.0)
+    if box['type'] == "power_up":
+        # Plus sign for power-up
+        glColor3f(1.0, 1.0, 0.0)
+        glBegin(GL_QUADS)
+        glVertex3f(-2, -0.5, 0)
+        glVertex3f(2, -0.5, 0)
+        glVertex3f(2, 0.5, 0)
+        glVertex3f(-2, 0.5, 0)
+        glVertex3f(-0.5, -2, 0)
+        glVertex3f(0.5, -2, 0)
+        glVertex3f(0.5, 2, 0)
+        glVertex3f(-0.5, 2, 0)
+        glEnd()
+    else:
+        # Exclamation mark for trap
+        glColor3f(1.0, 1.0, 1.0)
+        glBegin(GL_QUADS)
+        glVertex3f(-0.5, -2, 0)
+        glVertex3f(0.5, -2, 0)
+        glVertex3f(0.5, 1, 0)
+        glVertex3f(-0.5, 1, 0)
+        glEnd()
+        glTranslatef(0, -2.5, 0)
+        glutSolidSphere(0.5, 6, 6)
+    
+    glPopMatrix()
+
+def draw_boxes():
+    """Draw all active magic boxes."""
+    update_boxes() 
+    
+    for box in magic_boxes:
+        if not box['collected']:
+            draw_box(box)
+
+def reset_boxes():
+    """Clear all boxes (useful for game restart)."""
+    global magic_boxes, last_spawn_time, box_counter
+    magic_boxes = []
+    last_spawn_time = 0
+    box_counter = 0
+
+#################################################
+
+# menu.py
+
+# ------------------ MENU STATE ------------------
+game_state = "menu"   # menu | playing | paused | gameover
+
+menu_buttons = [
+    {"label": "Play",  "x": 400, "y": 500, "w": 200, "h": 50, "action": "resume"},
+    {"label": "Restart", "x": 400, "y": 420, "w": 200, "h": 50, "action": "restart"},
+    {"label": "Exit",    "x": 400, "y": 340, "w": 200, "h": 50, "action": "exit"},
+]
+
+# ------------------ DRAWING ------------------
+def draw_text(x, y, text):
+    glColor3f(1, 1, 1)
+    glRasterPos2f(x, y)
+    for ch in text:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(ch))
+
+def draw_button(btn):
+    # Background rectangle
+    glColor3f(0.2, 0.2, 0.5)
+    glBegin(GL_QUADS)
+    glVertex2f(btn["x"], btn["y"])
+    glVertex2f(btn["x"] + btn["w"], btn["y"])
+    glVertex2f(btn["x"] + btn["w"], btn["y"] + btn["h"])
+    glVertex2f(btn["x"], btn["y"] + btn["h"])
+    glEnd()
+
+    # Label
+    glColor3f(1, 1, 1)
+    draw_text(btn["x"] + 60, btn["y"] + 20, btn["label"])
+
+def draw_menu():
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    gluOrtho2D(0, WIN_W, 0, WIN_H)
+
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+
+    glDisable(GL_LIGHTING)
+    glDisable(GL_DEPTH_TEST)   # <-- IMPORTANT: draw always on top
+
+    for btn in menu_buttons:
+        draw_button(btn)
+
+    glEnable(GL_DEPTH_TEST)    # restore
+    glEnable(GL_LIGHTING)
+
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+
+
+# ------------------ LOGIC ------------------
+def restart_game():
+    global ufo_yaw, ufo_state, beam_active, score
+    spawn_initial_humans()
+    init_city()
+    reset_boxes()
+    ufo_pos[:] = [0.0, 0.0, 60.0]
+    ufo_yaw = 0.0
+    ufo_state = "flying"
+    beam_active = False
+    score = 0
+    print("[Game] Restarted")
+
+def handle_menu_click(x, y):
+    global game_state
+    y = WIN_H - y
+    for btn in menu_buttons:
+        if (btn["x"] <= x <= btn["x"] + btn["w"] and
+            btn["y"] <= y <= btn["y"] + btn["h"]):
+            if btn["action"] == "resume":
+                game_state = "playing"
+            elif btn["action"] == "restart":
+                restart_game()
+                game_state = "playing"
+            elif btn["action"] == "exit":
+                glutLeaveMainLoop()
+
+
 
 #-------------------------------------------------------------------------------------------------------
 #                                     Main
@@ -503,23 +908,17 @@ def update_abductions(dt):
 
 
 
-# import ufo_base
-# import ufo_beam
-# import abduction
-# import city
-# import random
-# import magic_box
-# import menu
+
 
 keys_down = set()
 last_time = None
 
 def update(dt):
-    # if menu.game_state != "playing":
-    #     return
+    if game_state != "playing":
+         return
     global keys_down,ufo_yaw, ufo_pos, ufo_state, altitude_fly, cam_look, cam_pos, WIN_W, WIN_H, beam_cooldown
     # Ensure we modify the shared UFO state
-    #pos = ufo_pos
+    pos = ufo_pos
     yaw = ufo_yaw
 
     can_move = (ufo_state != "landed")
@@ -576,28 +975,28 @@ def update(dt):
     update_human_movement(dt)
     
     # Magic box beam collection
-    # if ufo_beam.beam_active:
-    #     h = max(1.0, ufo_pos[2])
-    #     top_r = 6.0
-    #     radius_ground = math.tan(math.radians(ufo_beam.beam_angle_deg)) * h + top_r
-    #     for box in magic_box.magic_boxes[:]:
-    #         if box['collected']:
-    #             continue
-    #         dx = box['x'] - pos[0]
-    #         dy = box['y'] - pos[1]
-    #         dist = math.hypot(dx, dy)
-    #         if dist <= radius_ground:
-    #             # Lift box upward gradually
-    #             box['lifted'] += 60.0 * dt
-    #             target_height = pos[2] - 6.0
-    #             if box['lifted'] >= target_height:
-    #                 box['lifted'] = target_height
-    #                 box['collected'] = True
-    #                 magic_box.apply_effect(box)
-    #                 # Remove collected box
-    #                 if box in magic_box.magic_boxes:
-    #                     magic_box.magic_boxes.remove(box)
-    #                 print(f"[Magic Box] Box collected via beam!")
+    if beam_active:
+        h = max(1.0, ufo_pos[2])
+        top_r = 6.0
+        radius_ground = math.tan(math.radians(beam_angle_deg)) * h + top_r
+        for box in magic_boxes[:]:
+            if box['collected']:
+                continue
+            dx = box['x'] - pos[0]
+            dy = box['y'] - pos[1]
+            dist = math.hypot(dx, dy)
+            if dist <= radius_ground:
+                # Lift box upward gradually
+                box['lifted'] += 60.0 * dt
+                target_height = pos[2] - 6.0
+                if box['lifted'] >= target_height:
+                    box['lifted'] = target_height
+                    box['collected'] = True
+                    apply_effect(box)
+                    # Remove collected box
+                    if box in magic_boxes:
+                        magic_boxes.remove(box)
+                    print(f"[Magic Box] Box collected via beam!")
 
      # Camera follow
     cam_offset = -220.0
@@ -625,42 +1024,42 @@ def display():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glEnable(GL_DEPTH_TEST)
 
-    # if menu.game_state == "playing":
+    if game_state == "playing":
         # draw your UFO world
-    setup_camera()
-    setup_lights()
-        #city.draw_city()
-    glEnable(GL_LIGHTING)
-    draw_ufo()
-    draw_humans()
-    glDisable(GL_LIGHTING)
-    draw_beam() 
-    glEnable(GL_LIGHTING)
-    #draw_boxes()
+        setup_camera()
+        setup_lights()
+        draw_city()
+        glEnable(GL_LIGHTING)
+        draw_ufo()
+        draw_humans()
+        glDisable(GL_LIGHTING)
+        draw_beam() 
+        glEnable(GL_LIGHTING)
+        draw_boxes()
 
 
         # Beam status string
-    if beam_active:
-        beam_status = f"Beam active: {beam_timer:.1f}s"
-    elif beam_cooldown_left > 0:
-        beam_status = f"Cooldown: {beam_cooldown_left:.1f}s"
-    else:
-         beam_status = "Beam ready"
+        if beam_active:
+            beam_status = f"Beam active: {beam_timer:.1f}s"
+        elif beam_cooldown_left > 0:
+            beam_status = f"Cooldown: {beam_cooldown_left:.1f}s"
+        else:
+            beam_status = "Beam ready"
 
      # Final status text
-    status = (
+        status = (
             f"Score={score} | "
             f"Humans left={sum(1 for h in humans if not h['abducted'])} | "
             f"{beam_status} | B=beam | L=land/K=ascend"
-        )
+            )
 
-    draw_text_2d(12, WIN_H - 24, status, GLUT_BITMAP_HELVETICA_18)
-
-
+        draw_text_2d(12, WIN_H - 24, status, GLUT_BITMAP_HELVETICA_18)
 
 
-    # else:
-    #     menu.draw_menu()
+
+
+    else:
+        draw_menu()
 
     glutSwapBuffers()
 
@@ -670,18 +1069,18 @@ def idle():
     glutPostRedisplay()
 
 def on_key_down(key, x, y):
-    global keys_down, ufo_state
+    global keys_down, ufo_state, game_state
 
     # ESC key → toggle menu/pause
-    # if key == b'\x1b':
-    #     if menu.game_state == "playing":
-    #         menu.game_state = "menu"
-    #     else:
-    #         menu.game_state = "playing"
+    if key == b'\x1b':
+        if game_state == "playing":
+            game_state = "menu"
+        else:
+            game_state = "playing"
 
-    # # If we are in menu mode, ignore other inputs
-    # if menu.game_state != "playing":
-    #     return
+    # If we are in menu mode, ignore other inputs
+    if game_state != "playing":
+        return
 
     # Add pressed key to active set
     keys_down.add(key)
@@ -690,11 +1089,11 @@ def on_key_down(key, x, y):
     if key == b'b':
         try_toggle_beam()
 
-    # Restart game instantly
-    # if key == b'r':
-        # menu.restart_game()
+    #Restart game instantly
+    if key == b'r':
+        restart_game()
 
-    # Landing and ascending
+    #Landing and ascending
     if key == b'l' and ufo_state == "flying":
         ufo_state = "landing"
     if key == b'k' and ufo_state == "landed":
@@ -704,13 +1103,17 @@ def on_key_down(key, x, y):
 def on_key_up(key, x, y):
     if key in keys_down: keys_down.remove(key)
 
-# def on_mouse(button, state, x, y):
-#     if menu.game_state in ["menu", "paused", "gameover"] and button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
-#         menu.handle_menu_click(x, y)
+def on_mouse(button, state, x, y):
+    if game_state in ["menu", "paused", "gameover"] and button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
+        handle_menu_click(x, y)
+
+
+
+
 
 
 def main():
-    # menu.restart_game()
+    restart_game()
     spawn_initial_humans()
     glutInit()
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
@@ -720,7 +1123,7 @@ def main():
     glutIdleFunc(idle)
     glutKeyboardFunc(on_key_down)
     glutKeyboardUpFunc(on_key_up)
-    #glutMouseFunc(on_mouse)
+    glutMouseFunc(on_mouse)
     
     glutMainLoop()
 
