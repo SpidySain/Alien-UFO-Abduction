@@ -1,3 +1,6 @@
+# ufo_base.py
+# Step 1: UFO model, ground, camera, movement
+
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
