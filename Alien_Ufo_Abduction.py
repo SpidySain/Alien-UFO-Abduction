@@ -505,7 +505,7 @@ def generate_chunk(cx, cz):
         bz = rng.uniform(z_start, z_end)
         w = rng.randint(20, 40)
         d = rng.randint(20, 40)
-        h = rng.randint(20, MAX_BUILDING_HEIGHT)
+        h = rng.randint(20, int(altitude_fly - 35))
         buildings.append((bx, bz, w, d, h))
 
     # Generate random trees
@@ -792,6 +792,274 @@ def reset_boxes():
 
 #################################################
 
+# ====================================================================================================
+#                                      ENEMIES + HEALTH SYSTEM
+# ====================================================================================================
+
+# --------- UFO Health ----------
+ufo_max_health = 100
+ufo_health = 100.0
+
+def reset_ufo_health():
+    global ufo_health
+    ufo_health = float(ufo_max_health)
+
+def damage_ufo(amount: float):
+    global ufo_health
+    ufo_health = max(0.0, ufo_health - float(amount))
+
+def check_game_over():
+    global game_state
+    if ufo_health <= 0.0 and game_state == "playing":
+        print("[Game] UFO destroyed — Game Over")
+        game_state = "gameover"
+
+def draw_ufo_healthbar():
+    """Battery-like health bar above UFO. Billboarded & depth-safe."""
+    glPushMatrix()
+    glTranslatef(ufo_pos[0], ufo_pos[1], ufo_pos[2] + 36.0)
+    # face the camera around Z
+    ang = math.degrees(math.atan2(cam_pos[1]-ufo_pos[1], cam_pos[0]-ufo_pos[0]))
+    glRotatef(ang, 0, 0, 1)
+    glScalef(1.8, 1.8, 1.0)
+
+    depth_was = glIsEnabled(GL_DEPTH_TEST)
+    light_was = glIsEnabled(GL_LIGHTING)
+    if depth_was: glDisable(GL_DEPTH_TEST)
+    if light_was: glDisable(GL_LIGHTING)
+
+    width = 38.0; height = 10.0; cap_w = 4.0
+    seg_count = 5; seg_gap = 0.8
+    inner_w = width - 4.0; inner_h = height - 4.0
+    seg_w = (inner_w - (seg_count - 1) * seg_gap) / seg_count
+
+    glLineWidth(2.0)
+    glColor3f(0.98, 0.98, 0.98)
+    glBegin(GL_LINE_LOOP)
+    glVertex3f(-width/2, -height/2, 0)
+    glVertex3f(width/2, -height/2, 0)
+    glVertex3f(width/2, height/2, 0)
+    glVertex3f(-width/2, height/2, 0)
+    glEnd()
+
+    glBegin(GL_QUADS)
+    glVertex3f(width/2, -height/4, 0)
+    glVertex3f(width/2 + cap_w, -height/4, 0)
+    glVertex3f(width/2 + cap_w, height/4, 0)
+    glVertex3f(width/2, height/4, 0)
+    glEnd()
+
+    frac = max(0.0, min(1.0, ufo_health / ufo_max_health))
+    lit_segments = int(frac * seg_count + 1e-6)
+    def seg_col():
+        if frac > 0.6: return (0.2, 0.9, 0.2)
+        if frac > 0.3: return (0.95, 0.8, 0.1)
+        return (0.95, 0.2, 0.1)
+
+    start_x = -inner_w/2
+    for i in range(seg_count):
+        x0 = start_x + i * (seg_w + seg_gap)
+        x1 = x0 + seg_w
+        y0 = -inner_h/2; y1 = inner_h/2
+        glColor3f(*(seg_col() if i < lit_segments else (0.25,0.25,0.25)))
+        glBegin(GL_QUADS)
+        glVertex3f(x0, y0, 0.1); glVertex3f(x1, y0, 0.1)
+        glVertex3f(x1, y1, 0.1); glVertex3f(x0, y1, 0.1)
+        glEnd()
+
+    if light_was: glEnable(GL_LIGHTING)
+    if depth_was: glEnable(GL_DEPTH_TEST)
+    glPopMatrix()
+
+# --------- Enemies / Projectiles ----------
+enemies = []       # dict: type, x,y,z, weapon, next_fire, fire_interval, rockets_left
+projectiles = []   # dict: type, x,y,z, vx,vy,vz, damage, radius, spawn, ttl, smoke
+MAX_ENEMIES = 14
+ENEMY_SPAWN_INTERVAL = 8.0
+_last_enemy_spawn_time = 0.0
+
+# Barrel offsets for visuals
+SOLDIER_BARREL_FORWARD = 2.4
+SOLDIER_BARREL_LEN     = 3.5
+SOLDIER_BARREL_Z       = 7.0
+
+TANK_BARREL_FORWARD = 3.4
+TANK_BARREL_LEN     = 5.0
+TANK_BARREL_Z       = 4.2
+
+def reset_enemies_and_projectiles():
+    global enemies, projectiles, _last_enemy_spawn_time
+    enemies = []
+    projectiles = []
+    _last_enemy_spawn_time = time.time()
+
+def spawn_enemy():
+    """Spawn soldier (gun/rocket) or tank (rocket)."""
+    ufx, ufy, _ = ufo_pos
+    angle = random.uniform(0, 2*math.pi)
+    dist = random.uniform(140, 320)
+    ex = ufx + math.cos(angle)*dist
+    ey = ufy + math.sin(angle)*dist
+
+    etype = random.choice(["soldier", "tank", "soldier"])
+    if etype == "soldier":
+        weapon = random.choice(["gun", "rocket"])
+        if weapon == "gun":
+            fire_interval = random.uniform(0.6, 1.0); rockets_left = 0
+        else:
+            fire_interval = random.uniform(2.8, 3.6); rockets_left = random.randint(2, 4)
+    else:
+        weapon = "rocket"
+        fire_interval = random.uniform(2.4, 3.0); rockets_left = random.randint(4, 6)
+
+    enemies.append({
+        'type': etype,
+        'x': ex, 'y': ey, 'z': 0.0,
+        'weapon': weapon,
+        'next_fire': time.time() + random.uniform(0.5, 1.2),
+        'fire_interval': fire_interval,
+        'rockets_left': rockets_left
+    })
+    print(f"[Enemy] Spawned {etype} with {weapon} at ({ex:.1f},{ey:.1f})")
+
+def update_enemy_spawning(dt):
+    global _last_enemy_spawn_time
+    now = time.time()
+    if len(enemies) < MAX_ENEMIES and (now - _last_enemy_spawn_time) >= ENEMY_SPAWN_INTERVAL:
+        for _ in range(random.randint(1, 2)):
+            if len(enemies) < MAX_ENEMIES:
+                spawn_enemy()
+        _last_enemy_spawn_time = now
+
+def _aim_vector(from_pos, to_pos):
+    vx = to_pos[0] - from_pos[0]
+    vy = to_pos[1] - from_pos[1]
+    vz = to_pos[2] - from_pos[2]
+    L = math.sqrt(vx*vx + vy*vy + vz*vz)
+    if L == 0: return (0.0, 0.0, 0.0)
+    return (vx/L, vy/L, vz/L)
+
+def enemy_fire(enemy):
+    """Projectiles start at barrel tip and head to UFO."""
+    global projectiles
+    ufx, ufy, ufz = ufo_pos
+
+    if enemy['type'] == "soldier":
+        ang = math.atan2(ufy - enemy['y'], ufx - enemy['x'])
+        tip_x = enemy['x'] + math.cos(ang) * (SOLDIER_BARREL_FORWARD + SOLDIER_BARREL_LEN)
+        tip_y = enemy['y'] + math.sin(ang) * (SOLDIER_BARREL_FORWARD + SOLDIER_BARREL_LEN)
+        tip_z = SOLDIER_BARREL_Z
+    else:
+        ang = math.atan2(ufy - enemy['y'], ufx - enemy['x'])
+        tip_x = enemy['x'] + math.cos(ang) * (TANK_BARREL_FORWARD + TANK_BARREL_LEN)
+        tip_y = enemy['y'] + math.sin(ang) * (TANK_BARREL_FORWARD + TANK_BARREL_LEN)
+        tip_z = TANK_BARREL_Z
+
+    source = (tip_x, tip_y, tip_z)
+    target = (ufx, ufy, ufz - 5.0)  # body center-ish
+    dirx, diry, dirz = _aim_vector(source, target)
+
+    if enemy['weapon'] == "gun":
+        speed = 340.0; damage = 5.0; radius = 1.2; ttl = 3.0; ptype = "bullet"; smoke = False
+    else:
+        if enemy['rockets_left'] <= 0: return
+        enemy['rockets_left'] -= 1
+        speed = 190.0; damage = 20.0; radius = 2.6; ttl = 6.0; ptype = "rocket"; smoke = True
+
+    projectiles.append({
+        'type': ptype,
+        'x': source[0], 'y': source[1], 'z': source[2],
+        'vx': dirx*speed, 'vy': diry*speed, 'vz': dirz*speed,
+        'damage': damage, 'radius': radius,
+        'spawn': time.time(), 'ttl': ttl, 'smoke': smoke
+    })
+
+def update_enemies(dt):
+    now = time.time()
+    for e in enemies:
+        if now >= e['next_fire']:
+            enemy_fire(e)
+            e['next_fire'] = now + e['fire_interval'] + random.uniform(-0.15, 0.25)
+
+def update_projectiles(dt):
+    """Move projectiles, collide with UFO and apply damage."""
+    global projectiles
+    center = (ufo_pos[0], ufo_pos[1], ufo_pos[2]-6.0)
+    ufo_radius = 28.0
+    now = time.time()
+    new_list = []
+    for p in projectiles:
+        p['x'] += p['vx'] * dt
+        p['y'] += p['vy'] * dt
+        p['z'] += p['vz'] * dt
+        if (now - p['spawn']) > p['ttl']: continue
+        if p['z'] < 0.0: continue
+
+        dx = p['x'] - center[0]; dy = p['y'] - center[1]; dz = p['z'] - center[2]
+        if (dx*dx + dy*dy + dz*dz) <= (ufo_radius + p['radius'])**2:
+            damage_ufo(p['damage'])
+            continue
+        new_list.append(p)
+    projectiles = new_list
+
+def draw_enemies():
+    """Soldiers carry visible guns; tanks show turret & barrel oriented at UFO."""
+    for e in enemies:
+        glPushMatrix()
+        glTranslatef(e['x'], e['y'], 0.0)
+        if e['type'] == "soldier":
+            glColor3f(0.15, 0.5, 0.2)
+            glPushMatrix(); glTranslatef(-0.6, 0, 0); gluCylinder(gluNewQuadric(), 0.6, 0.6, 5.0, 8, 1); glPopMatrix()
+            glPushMatrix(); glTranslatef( 0.6, 0, 0); gluCylinder(gluNewQuadric(), 0.6, 0.6, 5.0, 8, 1); glPopMatrix()
+            glPushMatrix(); glTranslatef(0, 0, 5.0); glScalef(2.0, 1.4, 3.0); glColor3f(0.2, 0.6, 0.25); glutSolidCube(2.0); glPopMatrix()
+            glColor3f(0.9, 0.8, 0.7)
+            glPushMatrix(); glTranslatef(0, 0, 9.8); glutSolidSphere(1.2, 12, 12); glPopMatrix()
+            glColor3f(0.15, 0.15, 0.17)
+            glPushMatrix()
+            ang = math.degrees(math.atan2(ufo_pos[1]-e['y'], ufo_pos[0]-e['x']))
+            glRotatef(ang, 0, 0, 1)
+            glTranslatef(SOLDIER_BARREL_FORWARD, 0, SOLDIER_BARREL_Z)
+            glRotatef(-90, 0, 1, 0)
+            gluCylinder(gluNewQuadric(), 0.3, 0.3, SOLDIER_BARREL_LEN, 8, 1)
+            glPopMatrix()
+        else:
+            glColor3f(0.25, 0.35, 0.45)
+            glPushMatrix(); glTranslatef(0, 0, 2.0); glScalef(8.0, 6.0, 2.5); glutSolidCube(2.0); glPopMatrix()
+            glColor3f(0.2, 0.25, 0.3)
+            glPushMatrix(); glTranslatef(0, 0, 4.0); glutSolidSphere(2.2, 10, 10); glPopMatrix()
+            glColor3f(0.1, 0.1, 0.12)
+            glPushMatrix()
+            ang = math.degrees(math.atan2(ufo_pos[1]-e['y'], ufo_pos[0]-e['x']))
+            glRotatef(ang, 0, 0, 1)
+            glTranslatef(TANK_BARREL_FORWARD, 0, TANK_BARREL_Z)
+            glRotatef(-90, 0, 1, 0)
+            gluCylinder(gluNewQuadric(), 0.5, 0.5, TANK_BARREL_LEN, 10, 1)
+            glPopMatrix()
+        glPopMatrix()
+
+def draw_projectiles():
+    lit = glIsEnabled(GL_LIGHTING)
+    if lit: glDisable(GL_LIGHTING)
+    for p in projectiles:
+        glPushMatrix()
+        glTranslatef(p['x'], p['y'], p['z'])
+        if p['type'] == "bullet":
+            glColor3f(1.0, 0.95, 0.2)
+            glutSolidSphere(0.9, 12, 12)
+        else:
+            glColor3f(1.0, 0.4, 0.1)
+            yaw = math.degrees(math.atan2(p['vy'], p['vx']))
+            pitch = -math.degrees(math.atan2(p['vz'], math.hypot(p['vx'], p['vy'])))
+            glRotatef(yaw, 0, 0, 1)
+            glRotatef(pitch, 0, 1, 0)
+            gluCylinder(gluNewQuadric(), 0.7, 0.0, 3.4, 12, 1)
+            glColor4f(1.0, 0.6, 0.2, 0.6)
+            glutSolidSphere(1.0, 10, 10)
+        glPopMatrix()
+    if lit: glEnable(GL_LIGHTING)
+
+#################################################
+
 # menu.py
 
 # ------------------ MENU STATE ------------------
@@ -861,6 +1129,9 @@ def restart_game():
     beam_active = False
     score = 0
     print("[Game] Restarted")
+    # --- Added for enemies/health ---
+    reset_enemies_and_projectiles()
+    reset_ufo_health()
 
 def handle_menu_click(x, y):
     global game_state
@@ -968,6 +1239,12 @@ def update(dt):
                         magic_boxes.remove(box)
                     print(f"[Magic Box] Box collected via beam!")
 
+    # --- Enemies & projectiles ---
+    update_enemy_spawning(dt)
+    update_enemies(dt)
+    update_projectiles(dt)
+    check_game_over()
+
      # Camera follow
     cam_offset = -220.0
     cam_pos[0] = ufo_pos[0] + math.cos(math.radians(ufo_yaw))*cam_offset
@@ -1001,9 +1278,12 @@ def display():
         draw_city()
         glEnable(GL_LIGHTING)
         draw_ufo()
+        draw_ufo_healthbar()      # <<< added
         draw_humans()
+        draw_enemies()            # <<< added
         glDisable(GL_LIGHTING)
         draw_beam() 
+        draw_projectiles()        # <<< added
         glEnable(GL_LIGHTING)
         draw_boxes()
 
@@ -1019,6 +1299,7 @@ def display():
      # Final status text
         status = (
             f"Score={score} | "
+            f"HP={int(ufo_health)}/{ufo_max_health} | "  # <<< added
             f"Humans left={sum(1 for h in humans if not h['abducted'])} | "
             f"{beam_status} | B=beam | L=land/K=ascend"
             )

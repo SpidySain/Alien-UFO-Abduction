@@ -11,6 +11,8 @@ import city
 import random
 import magic_box
 import menu
+import enemies
+import health
 
 keys_down = set()
 last_time = None
@@ -75,6 +77,11 @@ def update(dt):
     # Abduction check
     abduction.update_abductions(dt)
     abduction.update_human_movement(dt)
+
+    glColor3f(1,0,0)
+    glRasterPos2f(10, ufo_base.WIN_H - 30)
+    for ch in f"Health: {enemies.ufo_health:.0f}":
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(ch))
     
     # Magic box beam collection
     if ufo_beam.beam_active:
@@ -139,6 +146,8 @@ def display():
         ufo_beam.draw_beam() 
         glEnable(GL_LIGHTING)
         magic_box.draw_boxes()
+        enemies.draw_enemies() 
+        health.draw_health_bar()
 
 
         # Beam status string
@@ -166,7 +175,6 @@ def display():
 
     glutSwapBuffers()
 
-    
 
 def idle():
     glutPostRedisplay()
@@ -195,6 +203,7 @@ def on_key_down(key, x, y):
     # Restart game instantly
     if key == b'r':
         menu.restart_game()
+        health.reset_health()    
 
     # Landing and ascending
     if key == b'l' and ufo_beam.ufo_state == "flying":
@@ -227,3 +236,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
