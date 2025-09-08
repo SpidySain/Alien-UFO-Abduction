@@ -23,62 +23,32 @@ ufo_turn_speed = 100.0
 hover_amp = 6.0
 hover_speed = 2.0
 
-def draw_ground():
-    """Dark ground plane with grid lines"""
-    glDisable(GL_LIGHTING)
-    glBegin(GL_QUADS)
-    glColor3f(0.12, 0.14, 0.18)
-    s = GROUND_SIZE / 2
-    glVertex3f(-s, -s, 0)
-    glVertex3f(s, -s, 0)
-    glVertex3f(s, s, 0)
-    glVertex3f(-s, s, 0)
-    glEnd()
-
-    # Grid lines
-    glLineWidth(1)
-    glColor3f(0.25, 0.28, 0.33)
-    glBegin(GL_LINES)
-    step = 60
-    for x in range(-int(s), int(s) + 1, step):
-        glVertex3f(x, -s, 0)
-        glVertex3f(x, s, 0)
-    for y in range(-int(s), int(s) + 1, step):
-        glVertex3f(-s, y, 0)
-        glVertex3f(s, y, 0)
-    glEnd()
-    glEnable(GL_LIGHTING)
 
 
 # ---------------- UFO Model ----------------
 
 def draw_ufo_opaque():
-    """Draw only opaque parts: base, rim, dome"""
     glPushMatrix()
     glTranslatef(*ufo_pos)
     glRotatef(ufo_yaw, 0, 0, 1)
-    glRotatef((time.time() * 30) % 360, 0, 0, 1)  # gentle spin
+    glRotatef((time.time() * 30) % 360, 0, 0, 1)  
 
-    # Base body (squashed sphere)
+    # Base body (
     glPushMatrix()
-    glColor3f(0.7, 0.7, 0.75)  # metallic gray
+    glColor3f(0.7, 0.7, 0.75)  
     glScalef(1.6, 1.6, 0.25)
     glutSolidSphere(30, 28, 18)
     glPopMatrix()
 
-    # Rim (torus ring)
+    # Rim 
     glColor3f(0.85, 0.85, 0.9)
     glutSolidTorus(5, 35, 24, 32)
 
-    # Dome (cockpit glass)
+    # Dome 
     glPushMatrix()
     glTranslatef(0, 0, 18)
-    glEnable(GL_BLEND)
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-    glColor4f(0.55, 0.75, 0.95, 0.4)  # <-- 40% opacity
+    glColor4f(0.55, 0.75, 0.95, 0.4)  
     glutSolidSphere(16, 20, 16)
-    glDisable(GL_BLEND)
-
     glPopMatrix()
 
     # Bottom lights (red-orange glow)
@@ -104,7 +74,7 @@ def draw_ufo_windows():
     glBlendFunc(GL_SRC_ALPHA, GL_ONE)
 
     # Force windows to render on top of the dome
-    glDepthMask(GL_FALSE)   # <-- Ignore depth test for writing
+    glDepthMask(GL_FALSE)   
     glDisable(GL_DEPTH_TEST)
     # Restore depth state
     glEnable(GL_DEPTH_TEST)
@@ -117,8 +87,8 @@ def draw_ufo_windows():
 
 
 def draw_ufo():
-    draw_ufo_opaque()      # Body + dome
-    draw_ufo_windows()     # Windows (always last)
+    draw_ufo_opaque()      
+    draw_ufo_windows()     
 
 
 # ---------------- Lighting ----------------
@@ -170,8 +140,8 @@ beam_active = False
 beam_cooldown = 5.0
 beam_cooldown_left = 0.0
 
-beam_duration = 10.0   # <-- Beam stays active for 10 seconds
-beam_timer = 0.0       # countdown timer for active time
+beam_duration = 10.0   
+beam_timer = 0.0      
 beam_angle_deg = 18.0
 
 # ---------------- UFO States ----------------
@@ -208,7 +178,7 @@ def try_toggle_beam():
     global beam_active, beam_cooldown_left, beam_timer
     if not beam_active and beam_cooldown_left == 0.0:
         beam_active = True
-        beam_timer = beam_duration   # start countdown
+        beam_timer = beam_duration  
     else:
         beam_active= not beam_active
 
@@ -238,25 +208,21 @@ HUMANS_PER_CHUNK = 8
 spawned_human_chunks = set()
 rng = random.Random(123)
 
-# def chunk_key(x, z):
-#     cx = int(x // city.CHUNK_SIZE)
-#     cz = int(z // city.CHUNK_SIZE)
-#     return (cx, cz)
+def chunk_key(x, z):
+    cx = int(x // CHUNK_SIZE)
+    cz = int(z // CHUNK_SIZE)
+    return (cx, cz)
 
 def spawn_humans_in_chunk(cx, cz):
-    # x_start = cx #* city.CHUNK_SIZE
-    # z_start = cz #* city.CHUNK_SIZE
-    # x_end = x_start #+ city.CHUNK_SIZE
-    # z_end = z_start #+ city.CHUNK_SIZE
+    x_start = cx * CHUNK_SIZE
+    z_start = cz * CHUNK_SIZE
+    x_end = x_start + CHUNK_SIZE
+    z_end = z_start + CHUNK_SIZE
 
-    # for _ in range(HUMANS_PER_CHUNK):
-    #     x = rng.uniform(x_start, x_end)
-    #     y = rng.uniform(z_start, z_end)
-    x_start, x_end = cx*100, cx*100 + 100
-    z_start, z_end = cz*100, cz*100 + 100
     for _ in range(HUMANS_PER_CHUNK):
         x = rng.uniform(x_start, x_end)
         y = rng.uniform(z_start, z_end)
+
         humans.append({
             'x': x,
             'y': y,
@@ -265,9 +231,9 @@ def spawn_humans_in_chunk(cx, cz):
             'vx': rng.uniform(-20, 20),
             'vy': rng.uniform(-20, 20),
             'dir_change_time': rng.uniform(2, 5),
-            'panic': False   # new flag
+            'panic': False,
+            'walk_cycle': 0.0   
         })
-
 
 
 def spawn_initial_humans():
@@ -282,52 +248,50 @@ def spawn_initial_humans():
             spawn_humans_in_chunk(dx, dz)
             spawned_human_chunks.add((dx, dz))
 
-# def update_humans():
-#     for chunk_key in city.generated_chunks:
-#         if chunk_key not in spawned_human_chunks:
-#             cx, cz = chunk_key
-#             spawn_humans_in_chunk(cx, cz)
-#             spawned_human_chunks.add(chunk_key)
+def update_humans():
+    for chunk_key in generated_chunks:
+        if chunk_key not in spawned_human_chunks:
+            cx, cz = chunk_key
+            spawn_humans_in_chunk(cx, cz)
+            spawned_human_chunks.add(chunk_key)
 
 def update_human_movement(dt):
-    """Update humans: wander randomly, but run from UFO if too close.
-       If being abducted (lifted > 0), they stop moving unless dropped.
-    """
+
     ufo_x, ufo_y, ufo_z = ufo_pos
 
     for h in humans:
         if h['abducted']:
-            continue  # abducted humans don't move at all
+            continue  
 
         # --- Check if human is lifted ---
         if h['lifted'] > 0.0:
-            # Compute distance from UFO
+            
             dx = h['x'] - ufo_x
             dy = h['y'] - ufo_y
             dist = math.hypot(dx, dy)
 
-            # Ground beam radius at UFO height
+           
             h_beam = max(1.0, ufo_z)
             top_r = 6.0
             radius_ground = math.tan(math.radians(beam_angle_deg)) * h_beam + top_r
 
             if beam_active and dist <= radius_ground:
-                # Still inside beam → freeze movement
+               
                 h['vx'] = 0.0
                 h['vy'] = 0.0
             else:
-                # Beam off OR UFO too far → fall down
+                
                 h['lifted'] = max(0.0, h['lifted'] - 60.0 * dt)
             continue
 
-        # --- Normal movement when not lifted ---
+    
         dx = h['x'] - ufo_x
         dy = h['y'] - ufo_y
         dist = math.hypot(dx, dy)
 
-        if dist < 120:  # panic radius
+        if dist < 120:  
             h['panic'] = True
-            angle = math.atan2(dy, dx)  # away from UFO
+            angle = math.atan2(dy, dx)  
             speed = 50.0
             h['vx'] = math.cos(angle) * speed
             h['vy'] = math.sin(angle) * speed
@@ -341,28 +305,31 @@ def update_human_movement(dt):
                 h['vy'] = math.sin(angle) * speed
                 h['dir_change_time'] = rng.uniform(2, 5)
 
-        # Apply movement
+
+        speed = math.hypot(h['vx'], h['vy'])
+        if speed > 1.0 and h['lifted'] == 0.0:  
+            if h['panic']:
+                h['walk_cycle'] += dt * speed * 0.35   
+            else:
+                h['walk_cycle'] += dt * speed * 0.2
+
         h['x'] += h['vx'] * dt
         h['y'] += h['vy'] * dt
 
 
-# Keep existing drawing code
+
 def draw_text_2d(x, y, s, font=GLUT_BITMAP_HELVETICA_18):
-    """
-    Draw 2D overlay text at window coords (0,0) bottom-left.
-    Uses ufo_base.WIN_W / WIN_H so it adapts to window resize.
-    """
-    # Save enable states so we can restore them exactly
+   
     depth_was = glIsEnabled(GL_DEPTH_TEST)
     light_was = glIsEnabled(GL_LIGHTING)
     tex_was   = glIsEnabled(GL_TEXTURE_2D)
 
-    # Force overlay mode (always on top)
+  
     if depth_was: glDisable(GL_DEPTH_TEST)
     if light_was: glDisable(GL_LIGHTING)
     if tex_was:   glDisable(GL_TEXTURE_2D)
 
-    # Setup orthographic projection matching window coords
+ 
     glMatrixMode(GL_PROJECTION)
     glPushMatrix()
     glLoadIdentity()
@@ -372,22 +339,19 @@ def draw_text_2d(x, y, s, font=GLUT_BITMAP_HELVETICA_18):
     glPushMatrix()
     glLoadIdentity()
 
-    # Make sure the color is white (or whatever you want)
+ 
     glColor3f(1.0, 1.0, 1.0)
 
-    # Draw text — raster pos uses the same coordinate system as the ortho above.
- 
     glRasterPos2f(x, y)
     for ch in s:
         glutBitmapCharacter(font, ord(ch))
 
-    # Restore matrices
+
     glPopMatrix()
     glMatrixMode(GL_PROJECTION)
     glPopMatrix()
     glMatrixMode(GL_MODELVIEW)
 
-    # Restore enable states
     if tex_was:   glEnable(GL_TEXTURE_2D)
     if light_was: glEnable(GL_LIGHTING)
     if depth_was: glEnable(GL_DEPTH_TEST)
@@ -396,9 +360,11 @@ def draw_text_2d(x, y, s, font=GLUT_BITMAP_HELVETICA_18):
 def draw_human(h):
     glPushMatrix()
     glTranslatef(h['x'], h['y'], h['lifted'])
-
+    
+    swing_amp = 25 if not h['panic'] else 50   
+    swing = math.sin(h['walk_cycle']) * swing_amp
     # --- Body ---
-    glColor3f(0.8, 0.7, 0.6)  # skin tone for simplicity
+    glColor3f(0.8, 0.7, 0.6)  
     glPushMatrix()
     glTranslatef(0, 0, 6)
     gluCylinder(gluNewQuadric(), 2.0, 2.0, 12.0, 8, 1)  # torso
@@ -413,41 +379,48 @@ def draw_human(h):
 
     # --- Arms ---
     glColor3f(0.8, 0.7, 0.6)
+    # Right arm
     glPushMatrix()
-    glTranslatef(0, 0, 14)       # shoulder height
-    glRotatef(90, 0, 1, 0)       # rotate cylinder sideways
-    gluCylinder(gluNewQuadric(), 0.8, 0.8, 8.0, 8, 1)  # right arm
+    glTranslatef(0, 0, 14)
+    glRotatef(90, 0, 1, 0)
+    glRotatef(swing, 1, 0, 0)   
+    gluCylinder(gluNewQuadric(), 0.8, 0.8, 8.0, 8, 1)
     glPopMatrix()
 
+    # Left arm
     glPushMatrix()
     glTranslatef(0, 0, 14)
     glRotatef(-90, 0, 1, 0)
-    gluCylinder(gluNewQuadric(), 0.8, 0.8, 8.0, 8, 1)  # left arm
+    glRotatef(-swing, 1, 0, 0) 
+    gluCylinder(gluNewQuadric(), 0.8, 0.8, 8.0, 8, 1)
     glPopMatrix()
 
     # --- Legs ---
     glPushMatrix()
-    glTranslatef(-1.0, 0, 0)     # left leg
+    glTranslatef(-1.0, 0, 0)
+    glRotatef(-swing, 1, 0, 0) 
     gluCylinder(gluNewQuadric(), 1.0, 1.0, 6.0, 8, 1)
     glPopMatrix()
 
+    # Right leg
     glPushMatrix()
-    glTranslatef(1.0, 0, 0)      # right leg
+    glTranslatef(1.0, 0, 0)
+    glRotatef(swing, 1, 0, 0)
     gluCylinder(gluNewQuadric(), 1.0, 1.0, 6.0, 8, 1)
     glPopMatrix()
 
-    glPopMatrix()
+    glPopMatrix() 
 
 
 def draw_humans():
-    #update_humans()
+    update_humans()
     for h in humans:
         if not h['abducted']:
             draw_human(h)
 
 
 def update_abductions(dt):
-    """Update human abductions when beam is active."""
+
     global score
     if not beam_active:
         return
@@ -456,41 +429,44 @@ def update_abductions(dt):
     beam_angle = math.radians(beam_angle_deg)
     abduction_speed = 140
 
-    # Beam axis = pointing down (negative Z)
     axis = (0.0, 0.0, -1.0)
-
     for hmn in humans:
         if hmn['abducted']:
             continue
 
-        # Vector from UFO to human (using current lifted height for z)
+       
         dx = hmn['x'] - ufo_x
         dy = hmn['y'] - ufo_y
-        dz = hmn['lifted'] - ufo_z  # human below UFO = negative
+        dz = hmn['lifted'] - ufo_z  
 
-        if dz < 0:  # must be below UFO
+        if dz < 0:  
             length = math.sqrt(dx*dx + dy*dy + dz*dz)
             if length == 0:
                 continue
 
-            # Normalize vector
+          
             vx, vy, vz = dx/length, dy/length, dz/length
 
-            # Dot product with axis (0,0,-1)
+          
             dot = vx*axis[0] + vy*axis[1] + vz*axis[2]
-            dot = max(-1.0, min(1.0, dot))  # clamp
+            dot = max(-1.0, min(1.0, dot)) 
             angle = math.acos(dot)
 
-            if angle <= beam_angle:  # Inside cone
-                target_height = ufo_z - 40.0
-                hmn['lifted'] += abduction_speed * dt
+            if angle <= beam_angle:
+             
+                h_beam = max(1.0, ufo_z)
+                top_r = 6.0
+                radius_ground = math.tan(math.radians(beam_angle_deg)) * h_beam + top_r
 
-                if hmn['lifted'] >= target_height:
-                    hmn['lifted'] = target_height
-                    hmn['abducted'] = True
-                    global score
-                    score += 1
+                dist_xy = math.hypot(dx, dy)     
+                if dist_xy <= radius_ground:
+                    target_height = ufo_z - 40.0
+                    hmn['lifted'] += abduction_speed * dt
 
+                    if hmn['lifted'] >= target_height:
+                        hmn['lifted'] = target_height
+                        hmn['abducted'] = True
+                        score += 1
 
 
 ###############################################
@@ -906,10 +882,6 @@ def handle_menu_click(x, y):
 #                                     Main
 #---------------------------------------------------------------------------------------------------------
 
-
-
-
-
 keys_down = set()
 last_time = None
 
@@ -917,13 +889,11 @@ def update(dt):
     if game_state != "playing":
          return
     global keys_down,ufo_yaw, ufo_pos, ufo_state, altitude_fly, cam_look, cam_pos, WIN_W, WIN_H, beam_cooldown
-    # Ensure we modify the shared UFO state
     pos = ufo_pos
     yaw = ufo_yaw
 
     can_move = (ufo_state != "landed")
 
-    # Forward and right vectors
     forward = [ math.cos(math.radians(yaw)), math.sin(math.radians(yaw)) ]
     right   = [ math.cos(math.radians(yaw+90)), math.sin(math.radians(yaw+90)) ]
 
@@ -966,7 +936,7 @@ def update(dt):
         t = time.time()
         ufo_pos[2] = altitude_fly + math.sin(t*2*math.pi*hover_speed)*hover_amp
 
-    # beam cooldown ticking
+   
     update_beam(dt)
 
     
@@ -1056,8 +1026,6 @@ def display():
         draw_text_2d(12, WIN_H - 24, status, GLUT_BITMAP_HELVETICA_18)
 
 
-
-
     else:
         draw_menu()
 
@@ -1106,10 +1074,6 @@ def on_key_up(key, x, y):
 def on_mouse(button, state, x, y):
     if game_state in ["menu", "paused", "gameover"] and button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
         handle_menu_click(x, y)
-
-
-
-
 
 
 def main():
