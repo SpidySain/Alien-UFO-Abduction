@@ -198,8 +198,6 @@ def update_beam(dt):
 #                                                   ABDUCTION
 # -------------------------------------------------------------------------------------------------------------------------
 
-
-
 humans = []
 score = 0
 
@@ -255,6 +253,15 @@ def update_humans():
             spawn_humans_in_chunk(cx, cz)
             spawned_human_chunks.add(chunk_key)
 
+def is_point_in_building(x, y):
+    for (bx, by, bw, bd, bh) in buildings:
+        half_w, half_d = bw / 2, bd / 2
+        if (bx - half_w <= x <= bx + half_w and
+            by - half_d <= y <= by + half_d):
+            return True
+    return False
+
+
 def update_human_movement(dt):
 
     ufo_x, ufo_y, ufo_z = ufo_pos
@@ -292,7 +299,7 @@ def update_human_movement(dt):
         if dist < 120:  
             h['panic'] = True
             angle = math.atan2(dy, dx)  
-            speed = 50.0
+            speed = 80.0
             h['vx'] = math.cos(angle) * speed
             h['vy'] = math.sin(angle) * speed
         else:
@@ -313,8 +320,34 @@ def update_human_movement(dt):
             else:
                 h['walk_cycle'] += dt * speed * 0.2
 
-        h['x'] += h['vx'] * dt
-        h['y'] += h['vy'] * dt
+        new_x = h['x'] + h['vx'] * dt
+        new_y = h['y'] + h['vy'] * dt
+
+        if not is_point_in_building(new_x, new_y):
+      
+            h['x'], h['y'] = new_x, new_y
+        else:
+            if h['panic']:
+                # Try sliding: keep at least one component of motion
+                moved = False
+                if not is_point_in_building(new_x, h['y']):
+                    h['x'] = new_x
+                    moved = True
+                if not is_point_in_building(h['x'], new_y):
+                    h['y'] = new_y
+                    moved = True
+
+                if not moved:
+                    # Completely stuck → pick a new escape angle with some randomness
+                    angle = math.atan2(dy, dx) + rng.uniform(-0.5, 0.5)
+                    h['vx'] = math.cos(angle) * 50.0
+                    h['vy'] = math.sin(angle) * 50.0
+            else:
+                # Wanderers just bounce away
+                h['vx'] *= -0.5
+                h['vy'] *= -0.5
+
+
 
 
 
